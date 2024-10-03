@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チーム分けシステム</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; }
+        h1 { color: #333; }
+        form { margin-bottom: 20px; }
+        input, select { margin-bottom: 10px; }
+        button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        #results { margin-top: 20px; }
+        .team { margin-bottom: 20px; }
+        .role-checkboxes { display: flex; gap: 10px; }
+        .role-checkboxes label { display: flex; align-items: center; }
+        .player-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .delete-btn { background-color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>チーム分けシステム</h1>
+    <form id="playerForm">
+        <input type="text" id="name" placeholder="名前" required>
+        <select id="rank" required>
+            {% for rank in ranks %}
+            <option value="{{ rank }}">{{ rank }}</option>
+            {% endfor %}
+        </select>
+        <div class="role-checkboxes">
+            {% for role in roles %}
+            <label>
+                <input type="checkbox" name="roles" value="{{ role }}"> {{ role }}
+            </label>
+            {% endfor %}
+        </div>
+        <button type="submit">プレイヤーを追加</button>
+    </form>
+    <button id="createTeams" disabled>チームを作成</button>
+    <div id="playerList"></div>
+    <div id="results"></div>
+
+    <script>
+        const players = [];
+
+        function updatePlayerList() {
+            const list = document.getElementById('playerList');
+            list.innerHTML = '<h3>追加されたプレイヤー:</h3>' + players.map((p, index) => `
+                <div class="player-item">
+                    <span>${p.name} (ランク: ${p.rank}, 役割: ${p.roles.join(', ')})</span>
+                    <button class="delete-btn" onclick="deletePlayer(${index})">削除</button>
+                </div>
+            `).join('');
+            document.getElementById('createTeams').disabled = players.length !== 10;
+        }
+
+        function deletePlayer(index) {
+            players.splice(index, 1);
+            updatePlayerList();
+        }
+
+        document.getElementById('playerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const rank = document.getElementById('rank').value;
+            const roles = Array.from(document.querySelectorAll('input[name="roles"]:checked')).map(checkbox => checkbox.value);
+            
+            if (roles.length === 0) {
+                alert('少なくとも1つの役割を選択してください。');
+                return;
+            }
+            
+            if (players.length >= 10) {
+                alert('プレイヤーは10人までしか追加できません。');
+                return;
+            }
+            
+            players.push({name, rank, roles});
+            updatePlayerList();
+            this.reset();
+        });
+
+        document.getElementById('createTeams').addEventListener('click', async function() {
+            if (players.length !== 10) {
+                alert('チーム分けには10人のプレイヤーが必要です。');
+                return;
+            }
+
+            try {
+                const response = await axios.post('/create_teams', { players });
+                const results = document.getElementById('results');
+                results.innerHTML = `
+                    <h2>チーム分け結果:</h2>
+                    <div class="team">
+                        <h3>チーム1:</h3>
+                        ${response.data.team1.map(p => `<div>${p.name} (ランク: ${p.rank}, 役割: ${p.roles.join(', ')})</div>`).join('')}
+                    </div>
+                    <div class="team">
+                        <h3>チーム2:</h3>
+                        ${response.data.team2.map(p => `<div>${p.name} (ランク: ${p.rank}, 役割: ${p.roles.join(', ')})</div>`).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.response?.data?.error || 'チーム作成中にエラーが発生しました。');
+            }
+        });
+    </script>
+</body>
+</html>
